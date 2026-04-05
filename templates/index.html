@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reel Scout — Find Any Reel</title>
+
+  <!-- Fonts: Syne (display) + Figtree (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Figtree:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Syne', 'sans-serif'],
+            body:    ['Figtree', 'sans-serif'],
+          },
+          colors: {
+            void:    '#06040f',
+            surface: '#0e0a1c',
+            panel:   '#130f22',
+            border:  '#1e1830',
+            purple:  { 400: '#c084fc', 500: '#a855f7', 600: '#9333ea', 700: '#7e22ce' },
+            pink:    { 400: '#f472b6', 500: '#ec4899', 600: '#db2777' },
+            glow:    '#7c3aed',
+          },
+          boxShadow: {
+            'glow-purple': '0 0 40px -5px rgba(124,58,237,0.55), 0 0 80px -20px rgba(168,85,247,0.3)',
+            'glow-card':   '0 8px 32px -4px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
+            'glow-btn':    '0 0 20px -4px rgba(168,85,247,0.7)',
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
+            'scan':       'scan 2s ease-in-out infinite',
+            'fade-up':    'fadeUp 0.5s ease forwards',
+            'spin-glow':  'spinGlow 1.4s linear infinite',
+          },
+          keyframes: {
+            scan: {
+              '0%, 100%': { opacity: '0.3', transform: 'translateY(0)' },
+              '50%':       { opacity: '1',   transform: 'translateY(6px)' },
+            },
+            fadeUp: {
+              from: { opacity: '0', transform: 'translateY(20px)' },
+              to:   { opacity: '1', transform: 'translateY(0)' },
+            },
+            spinGlow: {
+              to: { transform: 'rotate(360deg)' },
+            },
+          },
+          backdropBlur: { xs: '2px' },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* ── Global Reset & Base ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background-color: #06040f;
+      font-family: 'Figtree', sans-serif;
+      color: #e2e0ea;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated Background Grid ─────────────────────────────────────── */
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(124,58,237,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,58,237,0.06) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, black 40%, transparent 100%);
+    }
+
+    /* ── Ambient Orbs ─────────────────────────────────────────────────── */
+    .orb {
+      position: fixed; border-radius: 50%; filter: blur(80px);
+      pointer-events: none; z-index: 0;
+    }
+    .orb-1 {
+      width: 600px; height: 400px;
+      background: radial-gradient(circle, rgba(126,34,206,0.22) 0%, transparent 70%);
+      top: -100px; left: -150px;
+      animation: floatOrb1 12s ease-in-out infinite alternate;
+    }
+    .orb-2 {
+      width: 500px; height: 400px;
+      background: radial-gradient(circle, rgba(219,39,119,0.16) 0%, transparent 70%);
+      top: 30%; right: -100px;
+      animation: floatOrb2 15s ease-in-out infinite alternate;
+    }
+    .orb-3 {
+      width: 400px; height: 300px;
+      background: radial-gradient(circle, rgba(88,28,220,0.18) 0%, transparent 70%);
+      bottom: 10%; left: 30%;
+      animation: floatOrb1 18s ease-in-out infinite alternate-reverse;
+    }
+
+    @keyframes floatOrb1 {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(60px, 40px) scale(1.1); }
+    }
+    @keyframes floatOrb2 {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(-40px, -60px) scale(0.95); }
+    }
+
+    /* ── Glassmorphism Card ───────────────────────────────────────────── */
+    .glass {
+      background: rgba(19, 15, 34, 0.65);
+      border: 1px solid rgba(124,58,237,0.2);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .glass-card {
+      background: rgba(14, 10, 28, 0.7);
+      border: 1px solid rgba(124,58,237,0.15);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .glass-card:hover {
+      border-color: rgba(168,85,247,0.5);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 60px -10px rgba(0,0,0,0.6), 0 0 30px -10px rgba(168,85,247,0.25);
+    }
+
+    /* ── Search Input Glow ────────────────────────────────────────────── */
+    .search-glow-wrap {
+      position: relative;
+    }
+    .search-glow-wrap::before {
+      content: '';
+      position: absolute; inset: -1px; border-radius: 999px;
+      background: linear-gradient(135deg, #7e22ce, #ec4899, #7e22ce);
+      background-size: 200% 200%;
+      animation: gradientShift 4s ease infinite;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .search-glow-wrap:focus-within::before { opacity: 1; }
+    .search-glow-wrap:focus-within {
+      filter: drop-shadow(0 0 24px rgba(124,58,237,0.5));
+    }
+
+    @keyframes gradientShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    #search-input {
+      background: rgba(19,15,34,0.9);
+      border: 1px solid rgba(124,58,237,0.3);
+      color: #e2e0ea;
+      caret-color: #a855f7;
+      transition: border-color 0.3s ease;
+      outline: none;
+    }
+    #search-input:focus { border-color: rgba(168,85,247,0.7); }
+    #search-input::placeholder { color: rgba(200,190,230,0.35); }
+
+    /* ── Scout Button ─────────────────────────────────────────────────── */
+    .btn-scout {
+      background: linear-gradient(135deg, #7e22ce 0%, #db2777 100%);
+      transition: all 0.3s ease;
+      position: relative; overflow: hidden;
+    }
+    .btn-scout::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .btn-scout:hover::before { opacity: 1; }
+    .btn-scout:hover {
+      box-shadow: 0 0 30px -4px rgba(168,85,247,0.8), 0 0 60px -20px rgba(236,72,153,0.5);
+      transform: translateY(-1px);
+    }
+    .btn-scout:active { transform: translateY(0); }
+    .btn-scout span { position: relative; z-index: 1; }
+
+    /* ── Gradient Text ────────────────────────────────────────────────── */
+    .gradient-text {
+      background: linear-gradient(135deg, #c084fc 0%, #f472b6 50%, #c084fc 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shimmer 4s linear infinite;
+    }
+    @keyframes shimmer {
+      to { background-position: 200% center; }
+    }
+
+    /* ── Loading Spinner ──────────────────────────────────────────────── */
+    .spinner {
+      width: 28px; height: 28px;
+      border: 2px solid rgba(168,85,247,0.2);
+      border-top-color: #a855f7;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Scan Line Animation (loading state) ─────────────────────────── */
+    .scan-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, #a855f7, #ec4899, transparent);
+      animation: scanDown 2s ease-in-out infinite;
+      box-shadow: 0 0 12px rgba(168,85,247,0.8);
+    }
+    @keyframes scanDown {
+      0%   { top: 0%; opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    /* ── Result Cards ─────────────────────────────────────────────────── */
+    .result-card { animation: fadeUp 0.45s ease forwards; opacity: 0; }
+    .result-card:nth-child(1) { animation-delay: 0.05s; }
+    .result-card:nth-child(2) { animation-delay: 0.12s; }
+    .result-card:nth-child(3) { animation-delay: 0.19s; }
+    .result-card:nth-child(4) { animation-delay: 0.26s; }
+    .result-card:nth-child(5) { animation-delay: 0.33s; }
+    .result-card:nth-child(6) { animation-delay: 0.40s; }
+    .result-card:nth-child(7) { animation-delay: 0.47s; }
+    .result-card:nth-child(8) { animation-delay: 0.54s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Dork Badge ───────────────────────────────────────────────────── */
+    .dork-badge {
+      font-family: 'Courier New', monospace;
+      font-size: 0.72rem;
+      color: rgba(192,132,252,0.85);
+      background: rgba(124,58,237,0.1);
+      border: 1px solid rgba(124,58,237,0.25);
+      border-radius: 8px;
+      padding: 10px 16px;
+      word-break: break-all;
+      line-height: 1.6;
+    }
+
+    /* ── View Reel Button ─────────────────────────────────────────────── */
+    .btn-view {
+      background: transparent;
+      border: 1px solid rgba(168,85,247,0.4);
+      color: #c084fc;
+      transition: all 0.25s ease;
+      position: relative; overflow: hidden;
+    }
+    .btn-view::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(126,34,206,0.3), rgba(219,39,119,0.2));
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    .btn-view:hover {
+      border-color: rgba(168,85,247,0.9);
+      color: #fff;
+      box-shadow: 0 0 20px -6px rgba(168,85,247,0.6);
+    }
+    .btn-view:hover::after { opacity: 1; }
+    .btn-view span { position: relative; z-index: 1; }
+
+    /* ── Empty & Error States ─────────────────────────────────────────── */
+    .empty-state { animation: fadeUp 0.4s ease forwards; }
+
+    /* ── Scrollbar Styling ────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #06040f; }
+    ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.4); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,0.6); }
+  </style>
+</head>
+
+<body class="font-body">
+
+  <!-- Background atmosphere -->
+  <div class="bg-grid"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- ── App Shell ────────────────────────────────────────────────────────── -->
+  <div class="relative z-10 min-h-screen flex flex-col">
+
+    <!-- ── Header ─────────────────────────────────────────────────────────── -->
+    <header class="flex items-center justify-between px-8 py-5 border-b border-white/5">
+      <div class="flex items-center gap-3">
+        <!-- Logo mark -->
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center"
+             style="background: linear-gradient(135deg,#7e22ce,#db2777);">
+          <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+        </div>
+        <span class="font-display font-700 text-lg tracking-tight text-white">
+          Reel<span class="gradient-text">Scout</span>
+        </span>
+      </div>
+
+      <div class="flex items-center gap-2 text-xs font-medium text-purple-400/70 border border-purple-500/20 rounded-full px-3 py-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse-slow"></span>
+        AI-Powered
+      </div>
+    </header>
+
+    <!-- ── Hero + Search ──────────────────────────────────────────────────── -->
+    <main class="flex-1 flex flex-col items-center px-4 pt-16 pb-12">
+
+      <!-- Hero Text -->
+      <div class="text-center mb-12 max-w-2xl">
+        <div class="inline-flex items-center gap-2 text-xs font-medium text-pink-400/80
+                    border border-pink-500/25 rounded-full px-4 py-1.5 mb-6">
+          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462
+                     c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921
+                     -.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838
+                     -.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81
+                     .588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+          </svg>
+          Gemini AI × SerpAPI
+        </div>
+
+        <h1 class="font-display text-5xl md:text-6xl font-800 leading-[1.08] text-white mb-5">
+          Find any Reel.<br/>
+          <span class="gradient-text">Describe it. Done.</span>
+        </h1>
+        <p class="text-base text-white/40 font-300 leading-relaxed max-w-lg mx-auto">
+          Instagram's search is broken. Ours isn't. Drop your messy description, tags,
+          locations — we'll find the Reel.
+        </p>
+      </div>
+
+      <!-- Search Panel -->
+      <div class="w-full max-w-2xl glass rounded-2xl p-5 mb-6"
+           style="box-shadow: 0 32px 80px -16px rgba(0,0,0,0.7), 0 0 0 1px rgba(124,58,237,0.1);">
+
+        <div class="search-glow-wrap rounded-full mb-4">
+          <input
+            id="search-input"
+            type="text"
+            placeholder="cat dancing on a rooftop in Mumbai #viral #dance #city..."
+            class="w-full rounded-full px-6 py-4 text-sm font-medium"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button id="scout-btn" onclick="runSearch()"
+            class="btn-scout flex-1 rounded-full py-3.5 text-sm font-semibold text-white tracking-wide font-display">
+            <span class="flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/>
+              </svg>
+              Scout Reels
+            </span>
+          </button>
+          <button onclick="clearResults()"
+            class="px-4 py-3.5 rounded-full text-sm text-white/30 hover:text-white/60
+                   border border-white/8 hover:border-white/20 transition-all duration-200">
+            Clear
+          </button>
+        </div>
+
+        <p class="text-center text-xs text-white/20 mt-3 font-light">
+          Press <kbd class="px-1.5 py-0.5 rounded bg-white/8 text-white/40 font-mono text-xs">Enter</kbd>
+          to scout · powered by Gemini Query Architect
+        </p>
+      </div>
+
+      <!-- ── Results Area ──────────────────────────────────────────────────── -->
+      <div class="w-full max-w-5xl">
+
+        <!-- Dork Query Display -->
+        <div id="dork-display" class="hidden mb-6 px-1">
+          <p class="text-xs text-white/30 mb-2 font-medium uppercase tracking-widest">
+            Query Architect Output
+          </p>
+          <div id="dork-text" class="dork-badge"></div>
+        </div>
+
+        <!-- Count Badge -->
+        <div id="count-badge" class="hidden flex items-center gap-2 mb-5 px-1">
+          <span class="text-sm font-semibold text-white/80">
+            <span id="result-count" class="gradient-text font-display text-lg"></span>
+            reels scouted
+          </span>
+          <div class="flex-1 h-px bg-white/5"></div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden flex flex-col items-center justify-center py-20 gap-6">
+          <div class="relative">
+            <div class="w-16 h-16 rounded-2xl glass overflow-hidden relative">
+              <div class="scan-line"></div>
+              <div class="w-full h-full flex items-center justify-center">
+                <svg class="w-7 h-7 text-purple-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M4
+                    6h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="text-center">
+            <p class="text-white/70 font-semibold text-sm mb-1.5">Scouting across Instagram...</p>
+            <p class="text-white/25 text-xs">Gemini is architecting your query</p>
+          </div>
+          <!-- Loading skeleton bars -->
+          <div class="w-full max-w-lg space-y-2 mt-2">
+            <div class="h-2 rounded-full bg-white/5 animate-pulse-slow" style="width: 80%"></div>
+            <div class="h-2 rounded-full bg-white/5 animate-pulse-slow" style="width: 60%; animation-delay: 0.2s"></div>
+            <div class="h-2 rounded-full bg-white/5 animate-pulse-slow" style="width: 70%; animation-delay: 0.4s"></div>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="hidden empty-state flex flex-col items-center py-16 text-center gap-4">
+          <div class="w-14 h-14 rounded-2xl glass flex items-center justify-center border border-red-500/20">
+            <svg class="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-red-400 font-semibold text-sm mb-1">Scout Failed</p>
+            <p id="error-message" class="text-white/30 text-xs max-w-xs"></p>
+          </div>
+        </div>
+
+        <!-- Empty Results State -->
+        <div id="empty-state" class="hidden empty-state flex flex-col items-center py-16 text-center gap-4">
+          <div class="w-14 h-14 rounded-2xl glass flex items-center justify-center">
+            <svg class="w-6 h-6 text-purple-400/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M4
+                6h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-white/50 font-semibold text-sm mb-1">No Reels Found</p>
+            <p class="text-white/25 text-xs max-w-xs">Try adding more keywords or different hashtags.</p>
+          </div>
+        </div>
+
+        <!-- Results Grid -->
+        <div id="results-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+
+      </div>
+    </main>
+
+    <!-- ── Footer ──────────────────────────────────────────────────────────── -->
+    <footer class="text-center py-6 border-t border-white/5 text-xs text-white/15">
+      Reel Scout · Gemini AI Query Architect × SerpAPI · Built for humans, not hashtags.
+    </footer>
+  </div>
+
+
+  <!-- ── JavaScript ──────────────────────────────────────────────────────── -->
+  <script>
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    const $  = id => document.getElementById(id);
+    const show = id => $( id).classList.remove('hidden');
+    const hide = id => $(id).classList.add('hidden');
+
+    // Enter key support
+    $('search-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') runSearch();
+    });
+
+    // ── Main Search Function ─────────────────────────────────────────────────
+    async function runSearch() {
+      const query = $('search-input').value.trim();
+      if (!query) {
+        $('search-input').focus();
+        $('search-input').style.borderColor = 'rgba(236,72,153,0.7)';
+        setTimeout(() => { $('search-input').style.borderColor = ''; }, 1500);
+        return;
+      }
+
+      // Reset UI
+      hide('dork-display');
+      hide('count-badge');
+      hide('error-state');
+      hide('empty-state');
+      $('results-grid').innerHTML = '';
+
+      // Show loading
+      show('loading');
+      setButtonState(true);
+
+      try {
+        const res = await fetch('/search', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ query }),
+        });
+
+        const data = await res.json();
+        hide('loading');
+
+        if (!res.ok) {
+          showError(data.error || 'Unknown error occurred.');
+          return;
+        }
+
+        // Show dork query
+        if (data.dork_query) {
+          $('dork-text').textContent = data.dork_query;
+          show('dork-display');
+        }
+
+        if (!data.results || data.results.length === 0) {
+          show('empty-state');
+          return;
+        }
+
+        // Show count
+        $('result-count').textContent = data.count;
+        show('count-badge');
+
+        // Render cards
+        data.results.forEach((reel, i) => renderCard(reel, i));
+
+      } catch (err) {
+        hide('loading');
+        showError('Network error. Is the Flask server running?');
+      } finally {
+        setButtonState(false);
+      }
+    }
+
+    // ── Render a Single Result Card ──────────────────────────────────────────
+    function renderCard(reel, index) {
+      const grid = $('results-grid');
+      const card = document.createElement('div');
+      card.className = 'result-card glass-card rounded-2xl p-5 flex flex-col gap-4';
+
+      // Thumbnail or placeholder
+      const thumbHTML = reel.thumbnail
+        ? `<img src="${escapeHTML(reel.thumbnail)}" alt="" class="w-full h-36 object-cover rounded-xl opacity-80" loading="lazy" />`
+        : `<div class="w-full h-36 rounded-xl flex items-center justify-center"
+                style="background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(219,39,119,0.08));">
+             <svg class="w-8 h-8 text-purple-400/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+               <path stroke-linecap="round" d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14
+                 M4 6h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"/>
+             </svg>
+           </div>`;
+
+      const title   = escapeHTML(reel.title   || 'Untitled Reel');
+      const snippet = escapeHTML(reel.snippet || 'No description available.');
+      const url     = escapeHTML(reel.url);
+
+      card.innerHTML = `
+        ${thumbHTML}
+        <div class="flex flex-col gap-2 flex-1">
+          <h3 class="text-sm font-semibold text-white/90 leading-snug line-clamp-2 font-display">
+            ${title}
+          </h3>
+          <p class="text-xs text-white/35 leading-relaxed line-clamp-3 font-light">
+            ${snippet}
+          </p>
+        </div>
+        <div class="flex items-center gap-2 mt-auto pt-3 border-t border-white/5">
+          <div class="flex-1 flex items-center gap-1.5 min-w-0">
+            <svg class="w-3 h-3 text-pink-400/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"/>
+              <path stroke-linecap="round" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+            </svg>
+            <span class="text-xs text-white/20 truncate font-light">${url}</span>
+          </div>
+          <a href="${url}" target="_blank" rel="noopener noreferrer"
+             class="btn-view shrink-0 rounded-xl px-4 py-2 text-xs font-semibold font-display">
+            <span>View Reel →</span>
+          </a>
+        </div>
+      `;
+
+      grid.appendChild(card);
+    }
+
+    // ── UI Utilities ─────────────────────────────────────────────────────────
+    function showError(msg) {
+      $('error-message').textContent = msg;
+      show('error-state');
+    }
+
+    function setButtonState(loading) {
+      const btn = $('scout-btn');
+      if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="flex items-center justify-center gap-2">
+          <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>
+          Scouting...
+        </span>`;
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = `<span class="flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/>
+          </svg>
+          Scout Reels
+        </span>`;
+      }
+    }
+
+    function clearResults() {
+      $('search-input').value = '';
+      $('results-grid').innerHTML = '';
+      hide('dork-display');
+      hide('count-badge');
+      hide('loading');
+      hide('error-state');
+      hide('empty-state');
+      $('search-input').focus();
+    }
+
+    function escapeHTML(str) {
+      const d = document.createElement('div');
+      d.appendChild(document.createTextNode(str));
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>
